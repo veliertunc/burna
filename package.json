@@ -14,7 +14,10 @@
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{ts,tsx,astro}\"",
     "typecheck": "astro check",
-    "start": "HOST=127.0.0.1 node ./dist/server/entry.mjs"
+    "start": "HOST=127.0.0.1 node ./dist/server/entry.mjs",
+    "desktop:prepare": "node scripts/prepare-desktop.mjs",
+    "desktop:dev": "tauri dev --no-dev-server",
+    "desktop:build": "tauri build"
   },
   "dependencies": {
     "@astrojs/node": "^11.1.11",
@@ -38,6 +41,7 @@
   "devDependencies": {
     "@astrojs/check": "^0.9",
     "@eslint/js": "^10",
+    "@tauri-apps/cli": "^2.12.4",
     "@types/busboy": "^1.5.5",
     "eslint": "^10",
     "eslint-plugin-react-hooks": "^7.1.1",

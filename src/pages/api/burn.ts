@@ -28,7 +28,10 @@ function failure(error: unknown) {
 }
 
 function isLocal({ clientAddress, request, url }: Parameters<APIRoute>[0]) {
+  const desktopToken = process.env.BURNA_DESKTOP_TOKEN
   return (
+    (!desktopToken ||
+      request.headers.get("X-Burna-Desktop") === desktopToken) &&
     ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(clientAddress) &&
     ["127.0.0.1", "localhost"].includes(url.hostname) &&
     request.headers.get("Host") === url.host &&

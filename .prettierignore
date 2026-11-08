@@ -4,3 +4,5 @@ coverage/
 pnpm-lock.yaml
 package-lock.json
 yarn.lock
+src-tauri/.desktop/
+src-tauri/target/

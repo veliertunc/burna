@@ -1,0 +1,29 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Burna",
+  "version": "0.0.1",
+  "identifier": "app.burna.desktop",
+  "build": {
+    "beforeDevCommand": { "script": "pnpm desktop:prepare", "wait": true },
+    "beforeBuildCommand": "pnpm desktop:prepare",
+    "frontendDist": "ui"
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": "default-src 'self'; base-uri 'none'; frame-ancestors 'none'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app"],
+    "icon": ["icons/icon.png", "icons/icon.icns"],
+    "externalBin": ["binaries/burna-node"],
+    "resources": { ".desktop/runtime/": "runtime/" },
+    "macOS": {
+      "minimumSystemVersion": "13.5",
+      "signingIdentity": "-",
+      "entitlements": "Entitlements.plist"
+    }
+  }
+}

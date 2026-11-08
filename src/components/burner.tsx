@@ -19,7 +19,19 @@ const modes = [
   { id: "data", label: "Burn files", icon: FolderOpenIcon },
 ] as const
 
-const headers = { "X-Burna-Request": "1" }
+declare global {
+  interface Window {
+    readonly __BURNA_DESKTOP_TOKEN__?: string
+  }
+}
+
+function requestHeaders() {
+  const headers = new Headers({ "X-Burna-Request": "1" })
+  if (window.__BURNA_DESKTOP_TOKEN__) {
+    headers.set("X-Burna-Desktop", window.__BURNA_DESKTOP_TOKEN__)
+  }
+  return headers
+}
 
 function formatSize(bytes: number) {
   if (bytes >= 1_000_000_000) return `${(bytes / 1_000_000_000).toFixed(2)} GB`
@@ -64,7 +76,7 @@ export function Burner() {
     setNotice(undefined)
     setDisc(undefined)
     try {
-      const response = await fetch("/api/burn", { headers })
+      const response = await fetch("/api/burn", { headers: requestHeaders() })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error)
       setDisc(result)
@@ -93,7 +105,7 @@ export function Burner() {
         `/api/burn?mode=${mode}&trackCopy=${trackCopy ? "1" : "0"}`,
         {
           method: "POST",
-          headers,
+          headers: requestHeaders(),
           body,
         }
       )

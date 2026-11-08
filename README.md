@@ -15,6 +15,22 @@ Open the loopback URL printed by Astro, usually `http://127.0.0.1:4321`. Choose 
 
 For a local production build, run `pnpm build` followed by `pnpm start`. The production server defaults to `http://127.0.0.1:4321`.
 
+## macOS desktop app
+
+The Tauri app uses the same burn workflows as the web app. It runs on macOS 13.5 or later and bundles its own Node.js runtime. CHD still requires `chdman` from `brew install rom-tools`.
+
+To build from source, install Xcode Command Line Tools and Rust 1.90 or later. Use native Node.js and Rust for your Mac’s architecture.
+
+```sh
+pnpm install
+pnpm desktop:dev
+pnpm desktop:build
+```
+
+`pnpm desktop:dev` builds the web UI and opens it in a Tauri window. Restart the dev command after changing the web UI. `pnpm desktop:build` creates `src-tauri/target/release/bundle/macos/Burna.app`. Open the app directly to launch its bundled burner. The first desktop build downloads the pinned Node runtime and Cargo dependencies.
+
+The local build uses an ad-hoc signature. Distribution outside the build Mac requires Apple signing and notarization.
+
 ## Supported formats
 
 | Format | Select | Media and requirements |
