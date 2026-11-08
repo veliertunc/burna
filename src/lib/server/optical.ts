@@ -1,21 +1,17 @@
 import { execFile } from "node:child_process"
 import { open, stat } from "node:fs/promises"
 import { promisify } from "node:util"
+import { join } from "node:path"
+
+import { BurnError } from "./burn-error"
+import { prepareImage } from "./images"
+import { recordCue } from "./track-recorder"
 
 import type { BurnMode } from "@/lib/burn"
 
 const exec = promisify(execFile)
 const hdiutil = "/usr/bin/hdiutil"
-const sectorSize = 2048
-
-export class BurnError extends Error {
-  constructor(
-    message: string,
-    readonly status = 400
-  ) {
-    super(message)
-  }
-}
+export const sectorSize = 2048
 
 export async function getDisc() {
   if (process.platform !== "darwin") {
@@ -95,7 +91,15 @@ async function validateIso(path: string) {
   }
 }
 
-export async function burnDisc(mode: BurnMode, source: string, image: string) {
+export async function burnDisc(
+  mode: BurnMode,
+  source: string,
+  files: string[],
+  directory: string,
+  trackCopy: boolean
+) {
+  let image = join(directory, "disc.iso")
+  const initialDisc = await getDisc()
   if (mode === "data") {
     try {
       await exec(
@@ -121,11 +125,35 @@ export async function burnDisc(mode: BurnMode, source: string, image: string) {
       )
     }
   } else {
-    await validateIso(image)
+    const prepared = await prepareImage(
+      source,
+      files,
+      directory,
+      initialDisc,
+      trackCopy
+    )
+    if (prepared.kind === "cue") {
+      await recordCue(prepared.path)
+      return
+    }
+    image = prepared.path
+    if (prepared.kind === "iso") await validateIso(image)
   }
 
   const disc = await getDisc()
-  if ((await stat(image)).size > disc.capacity) {
+  if (disc.kind !== initialDisc.kind) {
+    throw new BurnError(
+      "The disc changed during preparation. Check the drive again.",
+      409
+    )
+  }
+  const { size } = await stat(image)
+  if (!size || size % sectorSize !== 0) {
+    throw new BurnError(
+      "The disc image does not contain complete optical sectors."
+    )
+  }
+  if (size > disc.capacity) {
     throw new BurnError(
       "The disc image is larger than the available space on the blank disc.",
       413

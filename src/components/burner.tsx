@@ -6,10 +6,16 @@ import {
 } from "@phosphor-icons/react"
 
 import { Button } from "@/components/ui/button"
-import { maxDiscBytes, maxFiles, type BurnMode } from "@/lib/burn"
+import {
+  imageAccept,
+  imageFormat,
+  maxDiscBytes,
+  maxFiles,
+  type BurnMode,
+} from "@/lib/burn"
 
 const modes = [
-  { id: "iso", label: "Burn ISO", icon: DiscIcon },
+  { id: "image", label: "Burn image", icon: DiscIcon },
   { id: "data", label: "Burn files", icon: FolderOpenIcon },
 ] as const
 
@@ -23,17 +29,35 @@ function formatSize(bytes: number) {
 }
 
 export function Burner() {
-  const [mode, setMode] = useState<BurnMode>("iso")
+  const [mode, setMode] = useState<BurnMode>("image")
   const [files, setFiles] = useState<File[]>([])
+  const [trackCopy, setTrackCopy] = useState(false)
   const [disc, setDisc] = useState<{ kind: string; capacity: number }>()
   const [working, setWorking] = useState<"checking" | "burning">()
   const [notice, setNotice] = useState<{ message: string; error: boolean }>()
 
   const size = files.reduce((total, file) => total + file.size, 0)
+  const format =
+    mode === "image" ? imageFormat(files.map((file) => file.name)) : undefined
   const invalidImage =
-    mode === "iso" &&
-    files.some((file) => !/\.iso$/i.test(file.name) || !file.size)
-  const tooLarge = size > Math.min(maxDiscBytes, disc?.capacity ?? maxDiscBytes)
+    mode === "image" &&
+    files.length > 0 &&
+    (!format || files.some((file) => !file.size))
+  const discLimit =
+    mode === "data" || format === "iso" || format === "cdr"
+      ? (disc?.capacity ?? maxDiscBytes)
+      : maxDiscBytes
+  const tooLarge = size > Math.min(maxDiscBytes, discLimit)
+  const needsCd = disc?.kind === "DVD" && (format === "cue" || format === "ccd")
+  const canBurn =
+    !working &&
+    !!disc &&
+    files.length > 0 &&
+    files.length <= maxFiles &&
+    !invalidImage &&
+    !tooLarge &&
+    !needsCd &&
+    (format !== "ccd" || trackCopy)
 
   async function checkDrive() {
     setWorking("checking")
@@ -57,15 +81,7 @@ export function Burner() {
 
   async function burn(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (
-      working ||
-      !disc ||
-      !files.length ||
-      tooLarge ||
-      invalidImage ||
-      files.length > maxFiles
-    )
-      return
+    if (!canBurn) return
 
     setWorking("burning")
     setNotice(undefined)
@@ -73,11 +89,14 @@ export function Burner() {
     for (const file of files)
       body.append("files", file, encodeURIComponent(file.name))
     try {
-      const response = await fetch(`/api/burn?mode=${mode}`, {
-        method: "POST",
-        headers,
-        body,
-      })
+      const response = await fetch(
+        `/api/burn?mode=${mode}&trackCopy=${trackCopy ? "1" : "0"}`,
+        {
+          method: "POST",
+          headers,
+          body,
+        }
+      )
       const result = await response.json()
       if (!response.ok) throw new Error(result.error)
       setNotice({ message: result.message, error: false })
@@ -111,6 +130,7 @@ export function Burner() {
                 if (mode !== id) {
                   setMode(id)
                   setFiles([])
+                  setTrackCopy(false)
                   setNotice(undefined)
                 }
               }}
@@ -123,21 +143,23 @@ export function Burner() {
         <label className="block space-y-2 border border-border p-4 text-sm">
           <span className="flex items-center gap-2 font-medium">
             <FileArrowUpIcon className="size-4" aria-hidden="true" />
-            {mode === "iso" ? "ISO image" : "Data files"}
+            {mode === "image" ? "Disc image" : "Data files"}
           </span>
           <span className="block text-xs leading-relaxed text-muted-foreground">
-            {mode === "iso"
-              ? "Write an existing ISO image to a CD or DVD."
+            {mode === "image"
+              ? "Choose one ISO, CDR, DMG, or CHD, or select all files in a BIN/CUE or CloneCD set."
               : "Create a data CD or DVD from the files you select."}
           </span>
           <input
             key={mode}
             type="file"
-            accept={mode === "iso" ? ".iso" : undefined}
-            multiple={mode === "data"}
-            onChange={(event) =>
+            accept={mode === "image" ? imageAccept : undefined}
+            multiple
+            onChange={(event) => {
               setFiles(Array.from(event.currentTarget.files ?? []))
-            }
+              setTrackCopy(false)
+              setNotice(undefined)
+            }}
             className="block w-full min-w-0 text-xs file:mr-3 file:border-0 file:bg-muted file:px-3 file:py-2 file:font-medium"
           />
           {files.length > 0 && (
@@ -149,12 +171,38 @@ export function Burner() {
         </label>
         {invalidImage && (
           <p role="alert" className="text-sm text-destructive">
-            Choose a non-empty .iso image.
+            Choose non-empty files for one supported image or a complete image
+            set.
           </p>
         )}
         {tooLarge && (
           <p role="alert" className="text-sm text-destructive">
-            The selection exceeds the available disc size.
+            {size > maxDiscBytes
+              ? "The selection exceeds the upload limit."
+              : "The selection exceeds the available disc size."}
+          </p>
+        )}
+        {format === "ccd" && (
+          <label className="flex items-start gap-2 text-xs leading-relaxed">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={trackCopy}
+              onChange={(event) => setTrackCopy(event.currentTarget.checked)}
+            />
+            Burn the CloneCD tracks and omit raw subchannel data and embedded
+            CD-Text.
+          </label>
+        )}
+        {format === "chd" && (
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            CHD requires chdman. CD extraction uses the track layout and can
+            omit raw subchannel data.
+          </p>
+        )}
+        {needsCd && (
+          <p role="alert" className="text-sm text-destructive">
+            Insert a blank CD for this image.
           </p>
         )}
         {files.length > maxFiles && (
@@ -184,19 +232,7 @@ export function Burner() {
       </fieldset>
 
       <div className="space-y-3 border-t border-border pt-5">
-        <Button
-          type="submit"
-          size="lg"
-          disabled={
-            !!working ||
-            !disc ||
-            !files.length ||
-            invalidImage ||
-            tooLarge ||
-            files.length > maxFiles
-          }
-          className="w-full"
-        >
+        <Button type="submit" size="lg" disabled={!canBurn} className="w-full">
           <DiscIcon aria-hidden="true" />
           {working === "burning" ? "Burning disc…" : "Burn and verify disc"}
         </Button>

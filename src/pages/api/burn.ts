@@ -3,7 +3,9 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { burnDisc, BurnError, getDisc } from "@/lib/server/optical"
+import { burnDisc, getDisc } from "@/lib/server/optical"
+import { BurnError } from "@/lib/server/burn-error"
+import { imageFormat } from "@/lib/burn"
 import { stageFiles } from "@/lib/server/upload"
 
 let busy = false
@@ -52,8 +54,8 @@ export const POST: APIRoute = async (context) => {
   if (busy) return reply({ error: "A burn is already in progress." }, 409)
 
   const mode = context.url.searchParams.get("mode")
-  if (mode !== "iso" && mode !== "data") {
-    return reply({ error: "Choose an ISO image or a data disc." }, 400)
+  if (mode !== "image" && mode !== "iso" && mode !== "data") {
+    return reply({ error: "Choose a disc image or a data disc." }, 400)
   }
 
   busy = true
@@ -62,10 +64,18 @@ export const POST: APIRoute = async (context) => {
     await getDisc()
     directory = await mkdtemp(join(tmpdir(), "burna-"))
     const source = join(directory, "files")
-    const image = join(directory, "disc.iso")
     await mkdir(source)
-    await stageFiles(context.request, mode, source, image)
-    await burnDisc(mode, source, image)
+    const files = await stageFiles(context.request, source)
+    if (mode === "iso" && imageFormat(files) !== "iso") {
+      throw new BurnError("Choose one ISO image.")
+    }
+    await burnDisc(
+      mode === "data" ? "data" : "image",
+      source,
+      files,
+      directory,
+      context.url.searchParams.get("trackCopy") === "1"
+    )
     return reply({ message: "The disc was burned, verified, and ejected." })
   } catch (error) {
     return failure(error)

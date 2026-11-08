@@ -5,15 +5,10 @@ import { pipeline } from "node:stream/promises"
 import type { ReadableStream as NodeReadableStream } from "node:stream/web"
 import busboy from "busboy"
 
-import { maxFiles, maxRequestBytes, type BurnMode } from "@/lib/burn"
-import { BurnError } from "./optical"
+import { maxFiles, maxRequestBytes } from "@/lib/burn"
+import { BurnError } from "./burn-error"
 
-export async function stageFiles(
-  request: Request,
-  mode: BurnMode,
-  source: string,
-  image: string
-) {
+export async function stageFiles(request: Request, source: string) {
   if (
     !request.body ||
     !request.headers.get("content-type")?.startsWith("multipart/form-data;")
@@ -34,13 +29,13 @@ export async function stageFiles(
       headers: Object.fromEntries(request.headers),
       defParamCharset: "utf8",
       preservePath: true,
-      limits: { files: mode === "iso" ? 1 : maxFiles, fields: 0 },
+      limits: { files: maxFiles, fields: 0 },
     })
   } catch {
     throw new BurnError("The upload could not be read.")
   }
 
-  const names = new Set<string>()
+  const names = new Map<string, string>()
   const writes: Promise<void>[] = []
   let fileError: BurnError | undefined
   let received = 0
@@ -53,11 +48,7 @@ export async function stageFiles(
   })
 
   parser.on("filesLimit", () => {
-    fileError = new BurnError(
-      mode === "iso"
-        ? "Choose one ISO image."
-        : `Choose up to ${maxFiles} files.`
-    )
+    fileError = new BurnError(`Choose up to ${maxFiles} files.`)
   })
   parser.on("fieldsLimit", () => {
     fileError = new BurnError("The upload contains an unexpected field.")
@@ -78,20 +69,17 @@ export async function stageFiles(
       // eslint-disable-next-line no-control-regex -- Reject control characters in filenames.
       /[/\\:\x00-\x1f\x7f]/.test(filename) ||
       Buffer.byteLength(filename) > 255 ||
-      names.has(key) ||
-      (mode === "iso" && !/\.iso$/i.test(filename))
+      names.has(key)
     ) {
-      fileError = new BurnError(
-        "Choose a .iso image or data files with valid, unique file names."
-      )
+      fileError = new BurnError("Choose files with valid, unique file names.")
     }
     if (fileError) {
       stream.resume()
       return
     }
 
-    names.add(key)
-    const target = mode === "iso" ? image : join(source, filename)
+    names.set(key, filename)
+    const target = join(source, filename)
     writes.push(
       pipeline(stream, createWriteStream(target, { flags: "wx" })).catch(() => {
         fileError ??= new BurnError(
@@ -120,4 +108,5 @@ export async function stageFiles(
 
   if (fileError) throw fileError
   if (!names.size) throw new BurnError("Choose at least one file.")
+  return [...names.values()]
 }
