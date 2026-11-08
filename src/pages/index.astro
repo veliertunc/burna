@@ -1,17 +1,24 @@
 ---
+import { Burner } from "@/components/burner"
 import Layout from "@/layouts/main.astro"
-import { Button } from "@/components/ui/button"
+
+Astro.response.headers.set("X-Frame-Options", "DENY")
 ---
 
 <Layout>
-  <div class="flex min-h-svh p-6">
-    <div class="flex max-w-md min-w-0 flex-col gap-4 text-sm leading-loose">
-      <div>
-        <h1 class="font-medium">Project ready!</h1>
-        <p>You may now add components and start building.</p>
-        <p>We've already added the button component for you.</p>
-        <Button client:load className="mt-2">Button</Button>
-      </div>
+  <main class="mx-auto flex min-h-svh w-full max-w-xl flex-col gap-7 px-5 py-10 sm:py-16">
+    <header class="space-y-3">
+      <p class="text-xs font-medium tracking-widest text-muted-foreground uppercase">
+        Local disc burner
+      </p>
+      <h1 class="text-4xl font-semibold tracking-tight">Burna</h1>
+      <p class="text-sm leading-relaxed text-muted-foreground">
+        Write ISO images and data files to a CD or DVD using a writer connected
+        to your Mac.
+      </p>
+    </header>
+    <div class="border border-border bg-card p-4 sm:p-6">
+      <Burner client:load />
     </div>
-  </div>
+  </main>
 </Layout>

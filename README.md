@@ -1,36 +1,24 @@
-# Astro + React + TypeScript + shadcn/ui
+# Burna
 
-This is a template for a new Astro project with React, TypeScript, and shadcn/ui.
+Burna is a local web app for writing an existing ISO image to a CD or DVD or creating a data disc from selected files. macOS handles writing, verifying and ejecting the disc.
 
-## Adding components
+## Run locally
 
-To add components to your app, run the following command:
+Use a Mac with a CD/DVD writer, a blank writable disc and the Node.js version in `package.json`.
 
-```bash
-npx shadcn@latest add button
+```sh
+pnpm install
+pnpm dev
 ```
 
-This will place the ui components in the `src/components` directory.
+Open the loopback URL printed by Astro, usually `http://127.0.0.1:4321`. Choose **Burn ISO** or **Burn files**, select the source, and use **Check drive** before starting the burn.
 
-## Using components
+For a local production build, run `pnpm build` followed by `pnpm start`. The production server uses port 4321 by default and listens on `127.0.0.1`.
 
-To use the components in your app, import them in an `.astro` file:
+## Supported workflows
 
-```astro
----
-import { Button } from "@/components/ui/button"
----
-
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width" />
-    <title>Astro App</title>
-  </head>
-  <body>
-    <div class="grid h-screen place-items-center content-center">
-      <Button>Button</Button>
-    </div>
-  </body>
-</html>
-```
+- **Burn ISO** writes a sector-aligned ISO 9660 or UDF optical image as a disc image.
+- **Burn files** creates a data CD or DVD with the selected files at the disc root.
+- Use one connected writer at a time. The app checks for blank CD or DVD media and compares the image size against the disc's reported writable space.
+- Files are staged on the Mac and removed after the job finishes. A data disc job needs temporary space for both the source files and the generated image.
+- Run the server on the Mac physically connected to the writer. The burn API accepts loopback requests from the local app.
